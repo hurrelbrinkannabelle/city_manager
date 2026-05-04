@@ -57,6 +57,14 @@ int main(int argc, char *argv[]){
             condition_count = argc - conditions_start;
             break;
         }
+        else if(strcmp(argv[i],"--remove_district")==0){
+            command="remove_district";
+            if (i + 1 >= argc) {
+                printf("Missing district for remove_district\n");
+                return 1;
+            }
+            district = argv[++i];
+        }
         
 
     }
@@ -103,6 +111,17 @@ int main(int argc, char *argv[]){
            return 1;
         }
         filter_reports(district, &argv[conditions_start], condition_count);
+    }
+    else if(command && strcmp(command,"remove_district")==0){
+        if(!district){
+            printf("Missing district wanted to delete!!!");
+            return 1;
+        }
+        if (strcmp(role, "manager") != 0) {
+            printf("Error: only manager can remove districts\n");
+            return 1;
+        }
+        remove_district(district,role,user);
     }
     
     
