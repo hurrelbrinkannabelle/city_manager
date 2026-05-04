@@ -8,4 +8,5 @@ void view_report(const char *district, const char *user, const char *role, int t
 int remove_report(const char *district, const char *role, int report_id);
 int update_threshold(const char *district, const char *role, int value);
 void filter_reports(const char *district, char **conditions, int count);
+void remove_district(const char*district,const char *role, const char *user);
 #endif

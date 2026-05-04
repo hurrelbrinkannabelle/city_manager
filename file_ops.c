@@ -6,7 +6,9 @@
 #include<stdlib.h>
 #include <string.h>
 #include <time.h>
-
+#include <sys/wait.h>
+#include <signal.h>
+#include <errno.h>
 #include "report.h"
 #include "permissions.h"
 
@@ -113,6 +115,50 @@ void write_log(const char *district, const char *role, const char *user, const c
 }
 
 
+void notify_monitor(const char *district, const char *role, const char *user){//phase 2 addition 
+    char pid_path[256];
+    snprintf(pid_path, sizeof(pid_path), ".monitor_pid");
+
+    int fd = open(pid_path, O_RDONLY);
+    if (fd < 0) {
+        write_log(district, role, user,
+            "Monitor NOT notified (missing .monitor_pid)");
+        return;
+    }
+
+    char buf[64];
+    ssize_t n = read(fd, buf, sizeof(buf) - 1);
+    close(fd);
+
+    if (n <= 0) {
+        write_log(district, role, user,
+            "Monitor NOT notified (empty .monitor_pid)");
+        return;
+    }
+
+    buf[n] = '\0';
+
+    pid_t monitor_pid = atoi(buf);
+    if (monitor_pid <= 0) {
+        write_log(district, role, user,
+            "Monitor NOT notified (invalid PID)");
+        return;
+    }
+
+    if (kill(monitor_pid, SIGUSR1) == -1) {
+        char msg[128];
+        snprintf(msg, sizeof(msg),
+            "Monitor NOT notified (kill failed: %s)", strerror(errno));
+
+        write_log(district, role, user, msg);
+        return;
+    }
+
+    write_log(district, role, user,
+        "Monitor notified successfully (SIGUSR1 sent)");
+}
+
+
 void add_report(const char *district, const char *user, const char *role){
     char path[256];
     snprintf(path, sizeof(path), "%s/reports.dat", district);
@@ -173,6 +219,7 @@ void add_report(const char *district, const char *user, const char *role){
 
     printf("Report added successfully in %s (ID=%d)\n", district, r.id);
     write_log(district, role, user, "add_report");
+    notify_monitor(district, role, user);//added for phase 2
 }
 
 void list_reports(const char *district, const char *user, const char *role){
@@ -303,7 +350,7 @@ int remove_report(const char *district, const char *role, int report_id){
 
     //shift left
     Report next;
-    off_t read_pos = pos + sizeof(Report);
+    off_t read_pos=pos+sizeof(Report);
 
     while (lseek(fd, read_pos, SEEK_SET) >= 0 && read(fd, &next, sizeof(Report)) == sizeof(Report)) {
 
@@ -455,7 +502,78 @@ void filter_reports(const char *district, char **conditions, int count){
 
     close(fd);
 }
+//should be removed in the parent process
+//only manager should be allowed to do this
+//use fork() to create  a child process that is a copy of the parent process(pid=fork()) if pid=0 =>child if pid>0 =>
+//put what the child does in if(pid==0){} and what parent whant to do in if(pid>0){}
+//wait() -> after parent reads termination state then child will be read and cleared by kernel!!! then call the unlink()
+//
+#include <ctype.h>
 
+int is_safe_id(const char *id){
+    if (id==NULL || id[0]=='\0')
+        return 0;
+    if (strstr(id, "..") != NULL)
+        return 0;
+    for (int i = 0; id[i] != '\0'; i++) {
+        if (!(isalnum(id[i]) || id[i] == '_' || id[i] == '-')) {
+            return 0;
+        }
+    }
+    return 1;
+}
 
+void remove_district(const char *district, const char *role, const char *user) {
 
+    if (strcmp(role, "manager")!= 0){
+        printf("ERROR: only manager can remove a district\n");
+        return;
+    }
+    if (!is_safe_id(district)){
+        printf("Invalid district id\n");
+        return;
+    }
 
+    char dir_path[256];
+    char link_path[256];
+
+    snprintf(dir_path, sizeof(dir_path), "%s", district);
+    struct stat st;
+    if (stat(dir_path, &st) <0){
+        printf("ERROR: district '%s' does not exist\n", district);
+        return;
+    }
+    snprintf(link_path, sizeof(link_path), "active_reports-%s", district);
+    write_log(district, role, user, "remove_district");
+    pid_t pid = fork();
+
+    if(pid<0){
+        perror("fork failed");
+        return;
+    }
+
+    if (pid ==0){
+        //CHILD:execute rm -rf
+        execlp("rm", "rm", "-rf", dir_path, NULL);
+        perror("exec failed");
+        _exit(1);
+    }
+
+    //Parent waits
+    int status;
+    if(waitpid(pid,&status,0)==-1){
+        perror("waitpid failed");
+        return;
+    }
+
+    //Check result
+    if(WIFEXITED(status) && WEXITSTATUS(status)== 0){
+        // remove symlink
+        unlink(link_path); 
+        write_log(district, role, user, "remove_district");//??????(oricum se sterge tot distructul deic nu ore aare rost sa scriu in logged_distict nimic(se sterege si el))
+        printf("District '%s' removed successfully\n", district);
+    } 
+    else{
+        printf("Failed to remove district '%s'\n", district);
+    }
+}
