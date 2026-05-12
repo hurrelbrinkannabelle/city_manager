@@ -1,0 +1,15 @@
+[1777546015] role=inspector user=maria action=add_report
+[1777546015] role=inspector user=maria action=Monitor notified successfully (SIGUSR1 sent)
+[1777546041] role=manager user=ana action=add_report
+[1777546041] role=manager user=ana action=Monitor notified successfully (SIGUSR1 sent)
+[1777546063] role=manager user=ioana action=add_report
+[1777546063] role=manager user=ioana action=Monitor notified successfully (SIGUSR1 sent)
+[1777546081] role=manager user=claudiu action=add_report
+[1777546081] role=manager user=claudiu action=Monitor notified successfully (SIGUSR1 sent)
+[1777546115] role=manager user=claudiu action=list_reports
+[1777959071] role=manager user=ioana action=add_report
+[1777959071] role=manager user=ioana action=Monitor notified successfully (SIGUSR1 sent)
+[1777959311] role=manager user=annabelle action=list_reports
+[1777959369] role=manager user=annabelle action=list_reports
+[1777959515] role=inspector user=maria action=list_reports
+[1777959808] role=manager user=system action=remove_report
